@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apple Tree World | 3D Sandbox</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background: radial-gradient(ellipse at 50% 30%, #0c1624 0%, #020407 100%);
+            overflow:hidden; width:100vw; height:100vh;
+            font-family:'Outfit',sans-serif; user-select:none; cursor:grab;
+        }
+        body:active { cursor:grabbing; }
+        #canvas-container { width:100%; height:100%; position:absolute; top:0; left:0; z-index:1; }
+
+        /* ── Panel ── */
+        .panel {
+            position:absolute; top:16px; left:16px; width:260px;
+            background:rgba(6,9,18,0.75); backdrop-filter:blur(20px);
+            border:1px solid rgba(255,255,255,0.07); border-radius:16px;
+            padding:16px; color:#fff; z-index:10;
+            box-shadow:0 20px 50px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08);
+            display:flex; flex-direction:column; gap:13px; pointer-events:auto;
+        }
+        .panel h1 {
+            font-size:16px; font-weight:700; letter-spacing:-0.02em;
+            background:linear-gradient(135deg,#fff 20%,#80d0ff);
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+        }
+        .panel p { font-size:11px; color:#607080; margin-top:2px; }
+        .sec-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#3a7fc1; margin-bottom:5px; }
+        .btn-row { display:flex; gap:6px; }
+        .btn {
+            flex:1; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07);
+            border-radius:9px; color:#a0b8cc; padding:9px 4px; font-size:11px; font-weight:500;
+            cursor:pointer; transition:all .2s; font-family:inherit; text-align:center;
+        }
+        .btn:hover { background:rgba(255,255,255,0.09); color:#fff; }
+        .btn.on {
+            background:linear-gradient(135deg,#00b8e6,#005acc); border-color:transparent;
+            color:#fff; font-weight:700; box-shadow:0 0 14px rgba(0,100,255,.4);
+        }
+        .guide { background:rgba(0,0,0,.3); border-radius:10px; padding:11px 13px; display:flex; flex-direction:column; gap:7px; }
+        .gr { display:flex; justify-content:space-between; font-size:11px; color:#8aacbc; }
+        .key { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.13); border-radius:5px; padding:2px 8px; font-size:10px; font-family:monospace; font-weight:700; }
+        .hint { position:absolute; bottom:16px; right:18px; font-size:9px; color:#2a4a62; letter-spacing:.08em; text-transform:uppercase; pointer-events:none; z-index:10; }
+
+        /* ── Mobile Controls ── */
+        .mob-controls {
+            display:none;         /* shown only on touch screens via JS */
+            position:absolute;
+            bottom:24px; left:0; right:0;
+            justify-content:space-between;
+            align-items:flex-end;
+            padding:0 24px;
+            z-index:20;
+            pointer-events:none;
+        }
+        .mob-controls.visible { display:flex; }
+
+        /* D-Pad */
+        .dpad {
+            position:relative;
+            width:132px; height:132px;
+            pointer-events:none;
+        }
+        .dpad-btn {
+            position:absolute;
+            width:42px; height:42px;
+            background:rgba(10,20,40,0.72);
+            border:1.5px solid rgba(0,190,255,0.40);
+            border-radius:12px;
+            display:flex; align-items:center; justify-content:center;
+            font-size:18px; line-height:1;
+            color:rgba(0,200,255,0.85);
+            cursor:pointer;
+            pointer-events:auto;
+            transition:background .12s;
+            -webkit-tap-highlight-color:transparent;
+            backdrop-filter:blur(8px);
+            box-shadow:0 4px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+            touch-action:none;
+        }
+        .dpad-btn:active, .dpad-btn.pressed {
+            background:rgba(0,140,220,0.55);
+            border-color:rgba(0,220,255,0.8);
+            box-shadow:0 0 14px rgba(0,180,255,0.5), inset 0 1px 0 rgba(255,255,255,0.12);
+        }
+        .dpad-up    { top:0;    left:45px; }
+        .dpad-left  { top:45px; left:0; }
+        .dpad-center{ top:45px; left:45px; border-color:rgba(255,255,255,0.06); color:rgba(255,255,255,0.2); pointer-events:none; }
+        .dpad-right { top:45px; left:90px; }
+        .dpad-down  { top:90px; left:45px; }
+
+        /* Jump button */
+        .jump-btn {
+            width:72px; height:72px;
+            background:rgba(10,20,40,0.72);
+            border:1.5px solid rgba(0,255,180,0.40);
+            border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+            font-size:24px;
+            color:rgba(0,255,180,0.85);
+            cursor:pointer;
+            pointer-events:auto;
+            -webkit-tap-highlight-color:transparent;
+            backdrop-filter:blur(8px);
+            box-shadow:0 4px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+            transition:all .12s;
+            touch-action:none;
+            flex-shrink:0;
+        }
+        .jump-btn:active, .jump-btn.pressed {
+            background:rgba(0,200,120,0.45);
+            border-color:rgba(0,255,180,0.9);
+            box-shadow:0 0 20px rgba(0,255,160,0.5), inset 0 1px 0 rgba(255,255,255,0.14);
+            transform:scale(0.93);
+        }
+
+        /* Responsive: hide desktop guide on small screens */
+        @media (max-width:600px) {
+            .panel { width:calc(100% - 32px); top:12px; left:12px; padding:14px; gap:10px; }
+            .panel h1 { font-size:14px; }
+            .desktop-guide { display:none; }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="canvas-container"></div>
+
+    <div class="panel">
+        <div>
+            <h1>🌳 Apple Tree World</h1>
+            <p>3D Interactive Sandbox</p>
+        </div>
+
+        <div>
+            <div class="sec-title">Tree Style</div>
+            <div class="btn-row">
+                <button class="btn on" id="t-lush" onclick="setTree('lush')">🌿 Lush</button>
+                <button class="btn" id="t-autumn" onclick="setTree('autumn')">🍂 Autumn</button>
+                <button class="btn" id="t-blossom" onclick="setTree('blossom')">🌸 Blossom</button>
+            </div>
+        </div>
+
+        <div class="desktop-guide">
+            <div class="sec-title">Controls</div>
+            <div class="guide">
+                <div class="gr"><span>Move</span><span class="key">WASD / Arrows</span></div>
+                <div class="gr"><span>Jump</span><span class="key">Space</span></div>
+                <div class="gr"><span>Rotate</span><span class="key">Drag</span></div>
+                <div class="gr"><span>Tree Style</span><span class="key">Tap Tree</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile D-Pad + Jump -->
+    <div class="mob-controls" id="mob-controls">
+        <div class="dpad" id="dpad">
+            <button class="dpad-btn dpad-up"    id="mb-up"    aria-label="Up">▲</button>
+            <button class="dpad-btn dpad-left"  id="mb-left"  aria-label="Left">◀</button>
+            <div    class="dpad-btn dpad-center">✦</div>
+            <button class="dpad-btn dpad-right" id="mb-right" aria-label="Right">▶</button>
+            <button class="dpad-btn dpad-down"  id="mb-down"  aria-label="Down">▼</button>
+        </div>
+        <button class="jump-btn" id="mb-jump" aria-label="Jump">🚀</button>
+    </div>
+
+    <div class="hint" id="hint-badge">Apple Tree World · 3D Sandbox</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+    <script>
+        // ─────────────────────────────────────────────────
+        //  CONSTANTS
+        // ─────────────────────────────────────────────────
+        const SURFACE = -1.6;   // Y where character feet rest (worldGroup space)
+        const GND_Y = SURFACE - 0.19; // ground cylinder centre
+        const GND_R = 8.2;    // platform radius
+        const GRAVITY = -0.014;
+        const JUMP_PWR = 0.26;
+        const MAX_SPD = 0.085;
+        const ACCEL = 0.024;
+        const FRIC = 0.79;
+
+        // ─────────────────────────────────────────────────
+        //  SCENE OBJECTS
+        // ─────────────────────────────────────────────────
+        let scene, camera, renderer;
+        let worldGroup, groundGroup, treeGroup, charGroup, charBody, charShadow, charHead;
+        let bgDots;
+        let luL, llL, ruL, rlL;   // upper/lower left/right leg groups
+        let luA, llA, ruA, rlA;   // upper/lower left/right arm groups
+
+        let isDrag = false;
+        let curGnd = 'circle', curTree = 'lush';
+        let treeCycleIdx = 0;
+        const TREE_CYCLE = ['lush', 'autumn', 'blossom'];
+
+        const vel = { x: 0, y: 0, z: 0 };
+        const keys = {};
+        let walkT = 0, onGround = true;
+        const bursts = [];
+
+        // Camera smooth follow target
+        let camTX = 0, camTY = 0, camTZ = 0;
+
+        // ─────────────────────────────────────────────────
+        //  INIT
+        // ─────────────────────────────────────────────────
+        function init() {
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 800);
+            camera.position.set(0, 2.5, 10);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(innerWidth, innerHeight);
+            renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Lights
+            scene.add(new THREE.AmbientLight(0xffffff, 0.60));
+            const sun = new THREE.DirectionalLight(0xfff5cc, 2.0);
+            sun.position.set(10, 18, 8); scene.add(sun);
+            const fill = new THREE.PointLight(0x4488ff, 0.7); fill.position.set(-8, 6, -5); scene.add(fill);
+            const under = new THREE.PointLight(0x00eebb, 0.2); under.position.set(0, -6, 0); scene.add(under);
+
+            buildBg();
+
+            worldGroup = new THREE.Group();     // rotated by drag; NO initial tilt
+            scene.add(worldGroup);
+
+            buildGround('circle');
+            buildTree('lush');
+            buildChar();
+
+            // Initial camera target
+            camTX = 0; camTY = 2.5; camTZ = 10;
+
+            loop();
+        }
+
+        // ─────────────────────────────────────────────────
+        //  BACKGROUND STARS
+        // ─────────────────────────────────────────────────
+        function buildBg() {
+            const N = 260, geo = new THREE.BufferGeometry();
+            const p = new Float32Array(N * 3);
+            for (let i = 0; i < N * 3; i += 3) { p[i] = (Math.random() - .5) * 50; p[i + 1] = (Math.random() - .5) * 40; p[i + 2] = (Math.random() - .5) * 20 - 12; }
+            geo.setAttribute('position', new THREE.BufferAttribute(p, 3));
+            bgDots = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x88bbff, size: .06, transparent: true, opacity: .45, blending: THREE.AdditiveBlending, depthWrite: false }));
+            scene.add(bgDots);
+        }
+
+        // ─────────────────────────────────────────────────
+        //  GROUND PLATFORM  (fixed — never moved by char)
+        // ─────────────────────────────────────────────────
+        function buildGround(shape) {
+            curGnd = shape;
+            if (groundGroup) { worldGroup.remove(groundGroup); disposeGrp(groundGroup); }
+            groundGroup = new THREE.Group();
+            groundGroup.position.y = GND_Y;
+            worldGroup.add(groundGroup);
+
+            let geo, ry = 0;
+            const R = GND_R;
+            if (shape === 'circle') { geo = new THREE.CylinderGeometry(R, R, .38, 80); }
+            if (shape === 'square') { geo = new THREE.CylinderGeometry(R * .9, R * .9, .38, 4); ry = Math.PI / 4; }
+            if (shape === 'hexagon') { geo = new THREE.CylinderGeometry(R * .95, R * .95, .38, 6); ry = Math.PI / 6; }
+
+            // Dark metallic slab
+            const plat = mesh(geo, mat({ color: 0x0c1522, roughness: .15, metalness: .92, clearcoat: 1, clearcoatRoughness: .04, flatShading: shape !== 'circle' }));
+            plat.rotation.y = ry; groundGroup.add(plat);
+
+            // Neon edge
+            const rim = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x00ccff, transparent: true, opacity: .9 }));
+            rim.rotation.y = ry; groundGroup.add(rim);
+
+            // Wire grid overlay
+            let gg;
+            if (shape === 'circle') gg = new THREE.RingGeometry(.3, R - .15, 6, 10);
+            if (shape === 'square') gg = new THREE.PlaneGeometry(R * 1.74, R * 1.74, 9, 9);
+            if (shape === 'hexagon') gg = new THREE.RingGeometry(.3, R - .15, 6, 6);
+            const gm = mesh(gg, new THREE.MeshBasicMaterial({ color: 0x003388, wireframe: true, transparent: true, opacity: .14 }));
+            gm.rotation.x = -Math.PI / 2; gm.position.y = .20;
+            if (shape === 'hexagon') gm.rotation.z = Math.PI / 6;
+            groundGroup.add(gm);
+        }
+
+        // ─────────────────────────────────────────────────
+        //  APPLE TREE  (fixed — only rotates on Y)
+        // ─────────────────────────────────────────────────
+        function buildTree(style) {
+            curTree = style;
+            if (treeGroup) { worldGroup.remove(treeGroup); disposeGrp(treeGroup); }
+            treeGroup = new THREE.Group();
+            // Tree sits with its base on the ground surface
+            treeGroup.position.set(0, SURFACE, 0);
+            worldGroup.add(treeGroup);
+
+            const FC = {
+                lush: [0x2a8c3a, 0x3ab050, 0x1e6e2e, 0x166028],
+                autumn: [0xc84808, 0xdc6010, 0xa83508, 0xe07210],
+                blossom: [0xee88b0, 0xdd5898, 0xffaacc, 0xcc4090]
+            };
+            const AC = { lush: 0xcc1810, autumn: 0xf4c020, blossom: 0xffffff };
+            const colors = FC[style], appleCol = AC[style];
+            const trunkM = mat({ color: 0x6a3a18, roughness: .90 });
+
+            // Trunk — base at y=0, top at y=2.2
+            const tk = mesh(new THREE.CylinderGeometry(.10, .26, 2.2, 14), trunkM);
+            tk.position.y = 1.10; treeGroup.add(tk);
+
+            // Branches
+            [
+                { tilt: .60, ry: 0, len: 1.4, r: .055, sy: .90 },
+                { tilt: -.55, ry: Math.PI, len: 1.3, r: .050, sy: 1.10 },
+                { tilt: .50, ry: Math.PI / 2, len: 1.2, r: .045, sy: 1.25 },
+                { tilt: -.45, ry: -Math.PI / 2, len: 1.1, r: .040, sy: 1.40 },
+            ].forEach(b => {
+                const br = mesh(new THREE.CylinderGeometry(b.r * .45, b.r, b.len, 8), trunkM);
+                br.position.set(
+                    Math.sin(b.ry) * Math.cos(b.tilt) * b.len * .5,
+                    b.sy + Math.sin(Math.abs(b.tilt)) * b.len * .52,
+                    Math.cos(b.ry) * Math.cos(b.tilt) * b.len * .5
+                );
+                br.rotation.z = b.tilt; br.rotation.y = b.ry;
+                treeGroup.add(br);
+            });
+
+            // Foliage clusters
+            [
+                { x: 0, y: 2.95, z: 0, r: 1.12, c: 0 },
+                { x: 1.0, y: 2.30, z: .20, r: .80, c: 1 },
+                { x: -.95, y: 2.38, z: .10, r: .76, c: 2 },
+                { x: .20, y: 2.22, z: 1.0, r: .73, c: 3 },
+                { x: .10, y: 2.18, z: -.95, r: .72, c: 1 },
+                { x: .55, y: 3.18, z: .45, r: .62, c: 0 },
+                { x: -.50, y: 3.12, z: -.40, r: .60, c: 2 },
+                { x: 0, y: 3.55, z: 0, r: .52, c: 3 },
+            ].forEach(f => {
+                const fGeo = style === 'autumn'
+                    ? new THREE.IcosahedronGeometry(f.r, 1)
+                    : new THREE.SphereGeometry(f.r, 14, 12);
+                const fMat = mat({
+                    color: colors[f.c], roughness: style === 'blossom' ? .35 : .72,
+                    clearcoat: style === 'blossom' ? .7 : 0, flatShading: style === 'autumn'
+                });
+                const fm = mesh(fGeo, fMat);
+                fm.position.set(f.x, f.y, f.z); treeGroup.add(fm);
+            });
+
+            // Hanging apples + stems
+            const apM = mat({ color: appleCol, roughness: .22, metalness: 0, clearcoat: .85 });
+            const stM = mat({ color: 0x3c1e08, roughness: .9 });
+            [
+                { x: .82, y: 2.30, z: .32 }, { x: -.76, y: 2.38, z: -.22 },
+                { x: .15, y: 2.20, z: .90 }, { x: .35, y: 2.90, z: .60 },
+                { x: -.42, y: 2.85, z: .25 }, { x: .65, y: 3.05, z: -.35 },
+                { x: -.25, y: 2.22, z: -.82 }, { x: .05, y: 3.32, z: .28 },
+                { x: .50, y: 2.55, z: .75 }, { x: -.55, y: 3.10, z: -.60 },
+            ].forEach(a => {
+                const am = mesh(new THREE.SphereGeometry(.115, 10, 10), apM.clone());
+                am.position.set(a.x, a.y, a.z); treeGroup.add(am);
+                const sm = mesh(new THREE.CylinderGeometry(.012, .012, .10, 4), stM);
+                sm.position.set(a.x, a.y + .155, a.z); treeGroup.add(sm);
+            });
+        }
+
+        // ─────────────────────────────────────────────────
+        //  HUMAN CHARACTER
+        // ─────────────────────────────────────────────────
+        function buildChar() {
+            if (charGroup) { worldGroup.remove(charGroup); disposeGrp(charGroup); }
+            if (charShadow) { worldGroup.remove(charShadow); charShadow.geometry.dispose(); charShadow.material.dispose(); }
+
+            charGroup = new THREE.Group();
+            charGroup.position.set(0, SURFACE, 2.8);  // starts visible in front of tree
+            worldGroup.add(charGroup);
+
+            // Materials
+            const skin = mat({ color: 0xf5c090, roughness: .55 });
+            const hair = mat({ color: 0x1a0e05, roughness: .85 });
+            const shirt = mat({ color: 0xcc2222, roughness: .50 });
+            const pants = mat({ color: 0x1a2a44, roughness: .60 });
+            const shoes = mat({ color: 0x111111, roughness: .75 });
+            const eyeM = new THREE.MeshBasicMaterial({ color: 0x050505 });
+
+            // Body pivot — y=0 is foot level
+            charBody = new THREE.Group();
+            charGroup.add(charBody);
+
+            // ── Shoes ──
+            [{ x: -.085 }, { x: .085 }].forEach(o => {
+                const s = mesh(new THREE.BoxGeometry(.092, .058, .155), shoes);
+                s.position.set(o.x, .029, .015); charBody.add(s);
+            });
+
+            // ── Legs (upper → lower as child hierarchy) ──
+            // Left
+            luL = new THREE.Group(); luL.position.set(-.088, .27, 0); charBody.add(luL);
+            mesh(new THREE.CylinderGeometry(.056, .046, .24, 10), pants).then = null; // dummy
+            addMeshTo(luL, new THREE.CylinderGeometry(.056, .046, .24, 10), pants, 0, -.12, 0);
+            llL = new THREE.Group(); llL.position.set(0, -.24, 0); luL.add(llL);
+            addMeshTo(llL, new THREE.CylinderGeometry(.044, .036, .22, 10), pants, 0, -.11, 0);
+
+            // Right
+            ruL = new THREE.Group(); ruL.position.set(.088, .27, 0); charBody.add(ruL);
+            addMeshTo(ruL, new THREE.CylinderGeometry(.056, .046, .24, 10), pants, 0, -.12, 0);
+            rlL = new THREE.Group(); rlL.position.set(0, -.24, 0); ruL.add(rlL);
+            addMeshTo(rlL, new THREE.CylinderGeometry(.044, .036, .22, 10), pants, 0, -.11, 0);
+
+            // ── Torso ──
+            addMeshTo(charBody, new THREE.CylinderGeometry(.145, .160, .36, 16), shirt, 0, .45, 0);
+
+            // Belt
+            const belt = new THREE.Mesh(new THREE.TorusGeometry(.148, .018, 6, 18), mat({ color: 0x4a3010, roughness: .5, metalness: .45 }));
+            belt.rotation.x = Math.PI / 2; belt.position.set(0, .275, 0); charBody.add(belt);
+
+            // ── Arms ──
+            // Left
+            luA = new THREE.Group(); luA.position.set(-.205, .565, 0); charBody.add(luA);
+            addMeshTo(luA, new THREE.CylinderGeometry(.038, .032, .22, 8), shirt, 0, -.11, 0);
+            llA = new THREE.Group(); llA.position.set(0, -.22, 0); luA.add(llA);
+            addMeshTo(llA, new THREE.CylinderGeometry(.030, .025, .20, 8), skin, 0, -.10, 0);
+            addMeshTo(llA, new THREE.SphereGeometry(.038, 8, 8), skin, 0, -.21, 0);  // hand
+
+            // Right
+            ruA = new THREE.Group(); ruA.position.set(.205, .565, 0); charBody.add(ruA);
+            addMeshTo(ruA, new THREE.CylinderGeometry(.038, .032, .22, 8), shirt, 0, -.11, 0);
+            rlA = new THREE.Group(); rlA.position.set(0, -.22, 0); ruA.add(rlA);
+            addMeshTo(rlA, new THREE.CylinderGeometry(.030, .025, .20, 8), skin, 0, -.10, 0);
+            addMeshTo(rlA, new THREE.SphereGeometry(.038, 8, 8), skin, 0, -.21, 0);  // hand
+
+            // ── Neck ──
+            addMeshTo(charBody, new THREE.CylinderGeometry(.055, .065, .10, 10), skin, 0, .690, 0);
+
+            // ── Head ──
+            charHead = new THREE.Group(); charHead.position.set(0, .800, 0); charBody.add(charHead);
+
+            addMeshTo(charHead, new THREE.SphereGeometry(.120, 18, 16), skin, 0, 0, 0);  // head
+
+            const hairDome = mesh(new THREE.SphereGeometry(.128, 16, 14), hair);
+            hairDome.position.set(0, .028, 0); hairDome.scale.y = .54; charHead.add(hairDome);
+            // Side hair
+            [{ x: -.104 }, { x: .104 }].forEach(o => addMeshTo(charHead, new THREE.SphereGeometry(.080, 10, 10), hair, o.x, -.010, -.015));
+
+            // Eyes
+            [{ x: -.042 }, { x: .042 }].forEach(o => addMeshTo(charHead, new THREE.SphereGeometry(.018, 7, 7), eyeM, o.x, .014, .108));
+            // Nose
+            addMeshTo(charHead, new THREE.SphereGeometry(.014, 6, 6), skin, 0, -.020, .114);
+            // Ears
+            [{ x: -.118 }, { x: .118 }].forEach(o => addMeshTo(charHead, new THREE.SphereGeometry(.030, 8, 8), skin, o.x, 0, 0));
+
+            // ── Shadow ──
+            charShadow = new THREE.Mesh(
+                new THREE.CircleGeometry(.22, 32),
+                new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .40, depthWrite: false, side: THREE.DoubleSide })
+            );
+            charShadow.rotation.x = -Math.PI / 2;
+            charShadow.position.set(0, SURFACE + .010, 2.8);
+            worldGroup.add(charShadow);
+        }
+
+        // ─────────────────────────────────────────────────
+        //  MAIN LOOP
+        // ─────────────────────────────────────────────────
+        function loop() {
+            requestAnimationFrame(loop);
+            const t = Date.now() * .001;
+
+            if (bgDots) { bgDots.rotation.y += .00015; bgDots.rotation.x += .00007; }
+            if (treeGroup) treeGroup.rotation.y += .0030;   // tree rotates in place
+
+            updateChar(t);
+            updateCam();
+            updateBursts();
+
+            renderer.render(scene, camera);
+        }
+
+        // ─────────────────────────────────────────────────
+        //  CHARACTER PHYSICS
+        // ─────────────────────────────────────────────────
+        function updateChar(t) {
+            if (!charGroup) return;
+
+            let ix = 0, iz = 0;
+            if (keys['w'] || keys['arrowup']) iz = -1;
+            if (keys['s'] || keys['arrowdown']) iz = 1;
+            if (keys['a'] || keys['arrowleft']) ix = -1;
+            if (keys['d'] || keys['arrowright']) ix = 1;
+            const ilen = Math.sqrt(ix * ix + iz * iz);
+            if (ilen > 0) { ix /= ilen; iz /= ilen; }
+
+            // Rotate input by world Y to keep WASD camera-relative
+            const wy = worldGroup.rotation.y;
+            const wdx = ix * Math.cos(wy) - iz * Math.sin(wy);
+            const wdz = ix * Math.sin(wy) + iz * Math.cos(wy);
+
+            if (ilen > 0) {
+                vel.x += wdx * ACCEL; vel.z += wdz * ACCEL;
+                const spd = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+                if (spd > MAX_SPD) { vel.x = vel.x / spd * MAX_SPD; vel.z = vel.z / spd * MAX_SPD; }
+                // Smoothly face direction
+                const ta = Math.atan2(wdx, wdz);
+                let diff = ta - charGroup.rotation.y;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                charGroup.rotation.y += diff * .14;
+            } else {
+                vel.x *= FRIC; vel.z *= FRIC;
+            }
+
+            vel.y += GRAVITY;
+            charGroup.position.x += vel.x;
+            charGroup.position.y += vel.y;
+            charGroup.position.z += vel.z;
+
+            // Land on ground
+            if (charGroup.position.y <= SURFACE) {
+                charGroup.position.y = SURFACE; vel.y = 0; onGround = true;
+                if (keys[' ']) { vel.y = JUMP_PWR; onGround = false; }
+            } else { onGround = false; }
+
+            clamp();
+
+            // Shadow follows character (x,z only)
+            if (charShadow) {
+                charShadow.position.x = charGroup.position.x;
+                charShadow.position.z = charGroup.position.z;
+                const h = charGroup.position.y - SURFACE;
+                const sc = Math.max(.12, 1 - h * .4);
+                charShadow.scale.setScalar(sc);
+                charShadow.material.opacity = Math.max(0, .40 - h * .18);
+            }
+
+            animateLimbs(t);
+        }
+
+        function clamp() {
+            const R = GND_R - .45;
+            const px = charGroup.position.x, pz = charGroup.position.z;
+            if (curGnd === 'circle') {
+                const d = Math.sqrt(px * px + pz * pz);
+                if (d > R) { charGroup.position.x = px / d * R; charGroup.position.z = pz / d * R; vel.x = 0; vel.z = 0; }
+            } else if (curGnd === 'square') {
+                const lim = R * .77;
+                if (px > lim) { charGroup.position.x = lim; vel.x = 0; }
+                if (px < -lim) { charGroup.position.x = -lim; vel.x = 0; }
+                if (pz > lim) { charGroup.position.z = lim; vel.z = 0; }
+                if (pz < -lim) { charGroup.position.z = -lim; vel.z = 0; }
+            } else {
+                const lim = R * .86, absX = Math.abs(px), absZ = Math.abs(pz);
+                const test = absX * .5 + absZ * .866;
+                if (absZ > lim || test > lim) { const s = lim / Math.max(absZ, test) * .95; charGroup.position.x = px * s; charGroup.position.z = pz * s; vel.x = 0; vel.z = 0; }
+            }
+        }
+
+        function animateLimbs(t) {
+            const spd = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+            const airborne = charGroup.position.y > SURFACE + .05;
+
+            if (airborne) {
+                luL.rotation.x = -.42; ruL.rotation.x = .42;
+                llL.rotation.x = .50; rlL.rotation.x = -.50;
+                luA.rotation.x = -.65; ruA.rotation.x = -.65;
+                llA.rotation.x = .20; rlA.rotation.x = .20;
+                luA.rotation.z = -.22; ruA.rotation.z = .22;
+            } else if (spd > .004) {
+                walkT += spd * 7;
+                const s = Math.sin(walkT), s2 = Math.sin(walkT * 2);
+                luL.rotation.x = s * .72; ruL.rotation.x = -s * .72;
+                llL.rotation.x = Math.max(0, -s) * .55; rlL.rotation.x = Math.max(0, s) * .55;
+                luA.rotation.x = -s * .52; ruA.rotation.x = s * .52;
+                llA.rotation.x = Math.max(0, s) * .28; rlA.rotation.x = Math.max(0, -s) * .28;
+                luA.rotation.z = 0; ruA.rotation.z = 0;
+                charBody.position.y = Math.abs(s2) * .026;
+                if (charHead) charHead.rotation.x = Math.sin(t * 2) * .030;
+            } else {
+                const br = Math.sin(t * 1.9) * .028;
+                luL.rotation.x = 0; ruL.rotation.x = 0;
+                llL.rotation.x = 0; rlL.rotation.x = 0;
+                luA.rotation.x = .06 + br; ruA.rotation.x = .06 + br;
+                llA.rotation.x = 0; rlA.rotation.x = 0;
+                luA.rotation.z = -.10; ruA.rotation.z = .10;
+                charBody.position.y = 0;
+                if (charHead) charHead.rotation.x = Math.sin(t * .8) * .012;
+            }
+        }
+
+        // ─────────────────────────────────────────────────
+        //  CAMERA FOLLOW  (ground stays fixed!)
+        // ─────────────────────────────────────────────────
+        function updateCam() {
+            if (!charGroup) return;
+            const wp = new THREE.Vector3();
+            charGroup.getWorldPosition(wp);
+
+            // Target: keep camera BEHIND+ABOVE character in world space
+            const txCam = wp.x * .48;
+            const tyCam = 2.5 + Math.max(0, wp.y - SURFACE) * .4;
+            const tzCam = wp.z + 9.0;   // always 9 units behind character
+
+            const lf = .060;
+            camTX += (txCam - camTX) * lf;
+            camTY += (tyCam - camTY) * lf;
+            camTZ += (tzCam - camTZ) * lf;
+
+            camera.position.x = camTX;
+            camera.position.y = camTY;
+            camera.position.z = camTZ;
+
+            // Look toward character (slightly above foot)
+            camera.lookAt(wp.x * .40, wp.y + .50, wp.z * .25);
+        }
+
+        // ─────────────────────────────────────────────────
+        //  UI CALLBACKS
+        // ─────────────────────────────────────────────────
+        function setGround(shape) {
+            buildGround(shape);
+            document.querySelectorAll('[id^="g-"]').forEach(b => b.classList.remove('on'));
+            document.getElementById('g-' + shape).classList.add('on');
+        }
+        function setTree(style) {
+            buildTree(style);
+            treeCycleIdx = TREE_CYCLE.indexOf(style);
+            document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('on'));
+            document.getElementById('t-' + style).classList.add('on');
+        }
+
+        // ─────────────────────────────────────────────────
+        //  KEYBOARD
+        // ─────────────────────────────────────────────────
+        window.addEventListener('keydown', e => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.code === 'Space') { keys[' '] = true; e.preventDefault(); }
+        });
+        window.addEventListener('keyup', e => {
+            keys[e.key.toLowerCase()] = false;
+            if (e.code === 'Space') keys[' '] = false;
+        });
+
+        // ─────────────────────────────────────────────────
+        //  DRAG TO ROTATE WORLD
+        // ─────────────────────────────────────────────────
+        let dmx = 0, dmy = 0, csx = 0, csy = 0, cst = 0;
+        window.addEventListener('mousedown', e => {
+            if (e.target.closest('.panel')) return;
+            isDrag = true; dmx = e.clientX; dmy = e.clientY; csx = e.clientX; csy = e.clientY; cst = Date.now();
+        });
+        window.addEventListener('mouseup', e => {
+            isDrag = false;
+            if (Math.hypot(e.clientX - csx, e.clientY - csy) < 6 && Date.now() - cst < 300) doClick(e.clientX, e.clientY);
+        });
+        window.addEventListener('mousemove', e => {
+            if (!isDrag || !worldGroup) return;
+            const dx = e.clientX - dmx, dy = e.clientY - dmy;
+            worldGroup.rotation.y += dx * .0048;
+            worldGroup.rotation.x = Math.max(-.60, Math.min(.60, worldGroup.rotation.x + dy * .0038));
+            dmx = e.clientX; dmy = e.clientY;
+        });
+
+        // ─────────────────────────────────────────────────
+        //  TOUCH — world rotate (only on canvas, not on controls)
+        // ─────────────────────────────────────────────────
+        let tsx = 0, tsy = 0, tst = 0, tpx = 0, tpy = 0;
+
+        function isMobControl(el) {
+            return el.closest('#mob-controls') || el.closest('.panel');
+        }
+
+        window.addEventListener('touchstart', e => {
+            const t0 = e.touches[0];
+            if (isMobControl(t0.target)) return;
+            isDrag = true; tpx = t0.clientX; tpy = t0.clientY;
+            tsx = tpx; tsy = tpy; tst = Date.now();
+        }, { passive: true });
+        window.addEventListener('touchend', e => {
+            isDrag = false;
+            const t = e.changedTouches[0]; if (!t) return;
+            if (!isMobControl(t.target) && Math.hypot(t.clientX - tsx, t.clientY - tsy) < 6 && Date.now() - tst < 300)
+                doClick(t.clientX, t.clientY);
+        });
+        window.addEventListener('touchmove', e => {
+            const t0 = e.touches[0];
+            if (!isDrag || !worldGroup || isMobControl(t0.target)) return;
+            const dx = t0.clientX - tpx, dy = t0.clientY - tpy;
+            worldGroup.rotation.y  += dx * .0048;
+            worldGroup.rotation.x   = Math.max(-.60, Math.min(.60, worldGroup.rotation.x + dy * .0038));
+            tpx = t0.clientX; tpy = t0.clientY;
+        }, { passive: true });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = innerWidth / innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(innerWidth, innerHeight);
+        });
+
+        // ─────────────────────────────────────────────────
+        //  MOBILE CONTROLS SETUP
+        // ─────────────────────────────────────────────────
+        (function setupMobileControls() {
+            // Detect touch device
+            const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+            if (isTouch) {
+                document.getElementById('mob-controls').classList.add('visible');
+                document.getElementById('hint-badge').style.display = 'none';
+            }
+
+            // Map button id → key name
+            const BK = { 'mb-up':'w', 'mb-down':'s', 'mb-left':'a', 'mb-right':'d', 'mb-jump':' ' };
+
+            function pressKey(id, down) {
+                const k = BK[id];
+                if (!k) return;
+                keys[k] = down;
+                const el = document.getElementById(id);
+                if (el) el.classList.toggle('pressed', down);
+            }
+
+            Object.keys(BK).forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+
+                el.addEventListener('touchstart', e => {
+                    e.stopPropagation();
+                    pressKey(id, true);
+                }, { passive: true });
+
+                el.addEventListener('touchend', e => {
+                    e.stopPropagation();
+                    pressKey(id, false);
+                }, { passive: true });
+
+                el.addEventListener('touchcancel', e => {
+                    e.stopPropagation();
+                    pressKey(id, false);
+                }, { passive: true });
+
+                // Also support mouse for desktop testing
+                el.addEventListener('mousedown', e => { e.stopPropagation(); pressKey(id, true); });
+                el.addEventListener('mouseup',   e => { e.stopPropagation(); pressKey(id, false); });
+                el.addEventListener('mouseleave',e => { pressKey(id, false); });
+            });
+        })();
+
+        // ─────────────────────────────────────────────────
+        //  CLICK → CYCLE TREE STYLE + PARTICLE BURST
+        // ─────────────────────────────────────────────────
+        const RC = new THREE.Raycaster(), MV = new THREE.Vector2();
+        function doClick(cx, cy) {
+            MV.x = (cx / innerWidth) * 2 - 1; MV.y = -(cy / innerHeight) * 2 + 1;
+            RC.setFromCamera(MV, camera);
+            if (!treeGroup) return;
+            const hits = RC.intersectObjects(treeGroup.children, true);
+            if (hits.length > 0) {
+                treeCycleIdx = (treeCycleIdx + 1) % TREE_CYCLE.length;
+                setTree(TREE_CYCLE[treeCycleIdx]);
+                burst(hits[0].point, 0x44ffaa, 24);
+            }
+        }
+
+        // ─────────────────────────────────────────────────
+        //  PARTICLE BURST
+        // ─────────────────────────────────────────────────
+        function burst(pos, hex, n) {
+            const geo = new THREE.BufferGeometry(), P = [], V = [], C = [];
+            const col = new THREE.Color(hex);
+            for (let i = 0; i < n; i++) {
+                P.push(pos.x + (Math.random() - .5) * .2, pos.y + (Math.random() - .5) * .2, pos.z + (Math.random() - .5) * .2);
+                const th = Math.random() * Math.PI * 2, ph = Math.acos(Math.random() * 2 - 1), sp = .04 + Math.random() * .09;
+                V.push(Math.sin(ph) * Math.cos(th) * sp, Math.sin(ph) * Math.sin(th) * sp, Math.cos(ph) * sp);
+                const c = col.clone(); c.offsetHSL(0, 0, (Math.random() - .5) * .12); C.push(c.r, c.g, c.b);
+            }
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+            geo.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+            const bmat = new THREE.PointsMaterial({ size: .11, transparent: true, opacity: 1, vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false });
+            const pts = new THREE.Points(geo, bmat); scene.add(pts);
+            bursts.push({ pts, geo, mat: bmat, V, age: 0, max: 55 });
+        }
+        function updateBursts() {
+            for (let i = bursts.length - 1; i >= 0; i--) {
+                const b = bursts[i]; b.age++;
+                if (b.age >= b.max) { scene.remove(b.pts); b.geo.dispose(); b.mat.dispose(); bursts.splice(i, 1); continue; }
+                b.mat.opacity = 1 - b.age / b.max;
+                const pa = b.geo.attributes.position.array;
+                for (let j = 0; j < pa.length; j += 3) { pa[j] += b.V[j]; pa[j + 1] += b.V[j + 1]; pa[j + 2] += b.V[j + 2]; b.V[j] *= .92; b.V[j + 1] *= .92; b.V[j + 2] *= .92; }
+                b.geo.attributes.position.needsUpdate = true;
+            }
+        }
+
+        // ─────────────────────────────────────────────────
+        //  HELPERS
+        // ─────────────────────────────────────────────────
+        function mesh(geo, material) {
+            return new THREE.Mesh(geo, material);
+        }
+        function mat(opts) {
+            const p = Object.assign({ color: 0xffffff, roughness: .5, metalness: 0 }, opts);
+            if ('clearcoat' in opts || 'clearcoatRoughness' in opts || 'flatShading' in opts) {
+                return new THREE.MeshPhysicalMaterial(p);
+            }
+            return new THREE.MeshStandardMaterial(p);
+        }
+        function addMeshTo(parent, geo, material, x, y, z) {
+            const m = new THREE.Mesh(geo, material);
+            m.position.set(x, y, z);
+            parent.add(m);
+            return m;
+        }
+        function disposeGrp(grp) {
+            grp.traverse(c => {
+                if (c.geometry) c.geometry.dispose();
+                if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach(m => m.dispose());
+            });
+        }
+
+        init();
+    </script>
+</body>
+
+</html>
